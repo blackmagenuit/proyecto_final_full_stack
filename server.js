@@ -23,14 +23,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Conexión a MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodb:27017/stock-app', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('✓ Conectado a MongoDB'))
-.catch(err => console.error('✗ Error en conexión a MongoDB:', err));
-
 // Rutas
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/products', require('./routes/products.routes'));
@@ -58,10 +50,21 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`\n🚀 Servidor corriendo en puerto ${PORT}`);
-  console.log(`📡 http://localhost:${PORT}\n`);
-});
+// Arrancar servidor y conectar a MongoDB solo cuando este archivo se ejecuta
+// directamente (node server.js), no cuando lo importan los tests.
+if (require.main === module) {
+  mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodb:27017/stock-app', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+  .then(() => console.log('✓ Conectado a MongoDB'))
+  .catch(err => console.error('✗ Error en conexión a MongoDB:', err));
 
-module.exports = { app, io };
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () => {
+    console.log(`\n🚀 Servidor corriendo en puerto ${PORT}`);
+    console.log(`📡 http://localhost:${PORT}\n`);
+  });
+}
+
+module.exports = { app, io, server };

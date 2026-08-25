@@ -1,0 +1,286 @@
+{
+  "info": {
+    "name": "Stock App - Pruebas manuales",
+    "description": "Colección para probar manualmente la API del Sistema de Gestión de Stock: autenticación, permisos por rol y CRUD de productos/movimientos/reportes. Importar en Postman o Insomnia junto con el environment 'Stock App Local'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api" },
+    { "key": "adminToken", "value": "" },
+    { "key": "operarioToken", "value": "" },
+    { "key": "productId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Registrar operario",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Operario Postman\",\n  \"email\": \"operario.postman@test.com\",\n  \"password\": \"password123\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('registra con status 201', () => pm.response.to.have.status(201));",
+                "pm.test('el rol por defecto es operario', () => pm.expect(pm.response.json().user.role).to.eql('operario'));",
+                "if (pm.response.json().token) pm.collectionVariables.set('operarioToken', pm.response.json().token);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Login admin de seed",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('login correcto', () => pm.response.to.have.status(200));",
+                "pm.test('devuelve rol administrador', () => pm.expect(pm.response.json().user.role).to.eql('administrador'));",
+                "if (pm.response.json().token) pm.collectionVariables.set('adminToken', pm.response.json().token);"
+              ]
+            }
+          }],
+          "description": "Requiere haber corrido antes `npm run seed`."
+        },
+        {
+          "name": "Login con contraseña incorrecta (debe fallar)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"incorrecta\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('rechaza con 401', () => pm.response.to.have.status(401));"] }
+          }]
+        },
+        {
+          "name": "Perfil propio (GET /me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('devuelve el perfil', () => pm.response.to.have.status(200));"] }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "2. Productos",
+      "item": [
+        {
+          "name": "Listar productos (autenticado)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/products"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('lista con 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+        {
+          "name": "Listar productos sin token (debe fallar)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/products" },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('rechaza sin token con 401', () => pm.response.to.have.status(401));"] }
+          }]
+        },
+        {
+          "name": "Crear producto como operario (debe fallar, 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{operarioToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Producto no autorizado\",\n  \"sku\": \"NOAUTH-001\",\n  \"category\": \"Otros\",\n  \"price\": 1\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('rechaza con 403', () => pm.response.to.have.status(403));"] }
+          }]
+        },
+        {
+          "name": "Crear producto como admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Producto Postman\",\n  \"sku\": \"POSTMAN-001\",\n  \"category\": \"Otros\",\n  \"price\": 15.5,\n  \"stock\": 10,\n  \"minStock\": 3\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('crea con 201', () => pm.response.to.have.status(201));",
+                "if (pm.response.json().data) pm.collectionVariables.set('productId', pm.response.json().data._id);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Editar producto como admin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"price\": 19.99\n}" }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('edita con 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+        {
+          "name": "Eliminar producto (baja lógica) como admin",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/products/{{productId}}"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('elimina con 200', () => pm.response.to.have.status(200));"] }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "3. Movimientos",
+      "item": [
+        {
+          "name": "Registrar entrada de stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/movements/entrada",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 20,\n  \"supplier\": \"Proveedor Postman\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('registra con 201', () => pm.response.to.have.status(201));"] }
+          }],
+          "description": "Usar un productId activo (no el eliminado en la carpeta anterior)."
+        },
+        {
+          "name": "Registrar salida mayor al stock (debe fallar, 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/movements/salida",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 999999,\n  \"reason\": \"Prueba de stock insuficiente\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('rechaza con 400', () => pm.response.to.have.status(400));"] }
+          }]
+        },
+        {
+          "name": "Listar movimientos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/movements"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('lista con 200', () => pm.response.to.have.status(200));"] }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "4. Reportes",
+      "item": [
+        {
+          "name": "Dashboard general",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/reports/dashboard"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('devuelve 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+        {
+          "name": "Stock por categoría",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/reports/stock-por-categoria"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('devuelve 200', () => pm.response.to.have.status(200));"] }
+          }]
+        },
+        {
+          "name": "Alertas de bajo stock",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/reports/alertas/bajo-stock"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('devuelve 200', () => pm.response.to.have.status(200));"] }
+          }]
+        }
+      ]
+    }
+  ]
+}

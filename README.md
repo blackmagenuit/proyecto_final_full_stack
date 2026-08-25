@@ -188,9 +188,17 @@ Authorization: Bearer <token>
 
 ## 🧪 Testing
 
+### Pruebas automatizadas (Jest + Supertest)
+
+```bash
+npm test
+```
+
+18 pruebas unitarias/integración sobre la API (auth, permisos por rol, CRUD de productos, entradas/salidas de stock, reportes). Corren contra una MongoDB en memoria (`mongodb-memory-server`), no requieren Docker ni una base real levantada.
+
 ### Postman/Insomnia
 
-Importa las rutas en tu cliente HTTP favorito.
+Colección lista para importar en [`postman/Stock-App.postman_collection.json`](postman/Stock-App.postman_collection.json), con tests embebidos por request. Ver [`postman/README.md`](postman/README.md) para el paso a paso.
 
 **Ejemplo de login:**
 ```
