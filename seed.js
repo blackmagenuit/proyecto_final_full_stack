@@ -17,8 +17,9 @@ const seedDatabase = async () => {
     await Product.deleteMany({});
     console.log('🗑️  Colecciones limpias');
 
-    // Crear usuarios
-    const usuarios = await User.insertMany([
+    // Crear usuarios (uno por uno para que se ejecute el hook de hasheo de contraseña,
+    // que insertMany no dispara)
+    const usuarios = await User.create([
       {
         name: 'Admin User',
         email: 'admin@example.com',
